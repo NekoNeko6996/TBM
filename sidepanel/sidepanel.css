@@ -19,17 +19,48 @@
 }
 
 /* Bảng 9 màu chuẩn của Chrome Tab Groups */
-.dot-grey   { background: #6b7280; }
-.dot-blue   { background: #3b82f6; }
-.dot-red    { background: #ef4444; }
-.dot-yellow { background: #eab308; }
-.dot-green  { background: #22c55e; }
-.dot-pink   { background: #ec4899; }
-.dot-purple { background: #a855f7; }
-.dot-cyan   { background: #06b6d4; }
-.dot-orange { background: #f97316; }
+.dot-grey {
+  background: #6b7280;
+}
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+.dot-blue {
+  background: #3b82f6;
+}
+
+.dot-red {
+  background: #ef4444;
+}
+
+.dot-yellow {
+  background: #eab308;
+}
+
+.dot-green {
+  background: #22c55e;
+}
+
+.dot-pink {
+  background: #ec4899;
+}
+
+.dot-purple {
+  background: #a855f7;
+}
+
+.dot-cyan {
+  background: #06b6d4;
+}
+
+.dot-orange {
+  background: #f97316;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
   background: var(--bg-canvas);
@@ -48,28 +79,47 @@ body {
   align-items: center;
   margin-bottom: 12px;
 }
-.sp-brand { font-size: 16px; font-weight: 600; }
-.sp-header-actions { display: flex; gap: 6px; }
 
-.btn-primary, .btn-outline {
+.sp-brand {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sp-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-primary,
+.btn-outline {
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
+
 .btn-primary {
   background: var(--accent);
   border: 1px solid var(--accent);
   color: #ffffff;
 }
+
 .btn-outline {
   background: var(--bg-surface);
   border: 1px solid var(--border-color);
   color: var(--text-main);
 }
-.btn-outline:hover { border-color: var(--accent); }
-.btn-outline:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-outline:hover {
+  border-color: var(--accent);
+}
+
+.btn-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .btn-text {
   border: none;
   background: transparent;
@@ -79,6 +129,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
 }
+
 .btn-text:hover {
   color: var(--text-main);
   background: var(--bg-subtle);
@@ -93,6 +144,7 @@ body {
   padding: 3px;
   margin-bottom: 12px;
 }
+
 .tab-btn {
   border: none;
   background: transparent;
@@ -103,15 +155,25 @@ body {
   font-weight: 500;
   cursor: pointer;
 }
+
 .tab-btn.active {
   background: var(--bg-canvas);
   color: var(--text-main);
   font-weight: 600;
 }
 
-.sp-content { flex: 1; overflow-y: auto; }
-.tab-pane { display: none; }
-.tab-pane.active { display: block; }
+.sp-content {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
 
 /* GROUP CARDS & COLOR PICKER */
 .card {
@@ -122,18 +184,21 @@ body {
   padding: 10px 12px;
   margin-bottom: 8px;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
 }
+
 .group-title-wrap {
   display: flex;
   align-items: center;
   gap: 8px;
   overflow: hidden;
 }
+
 .color-dot {
   width: 12px;
   height: 12px;
@@ -142,17 +207,24 @@ body {
   cursor: pointer;
   flex-shrink: 0;
 }
+
 .group-name {
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .group-count {
   color: var(--text-muted);
   font-size: 12px;
 }
-.actions { display: flex; gap: 2px; flex-shrink: 0; }
+
+.actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
 
 /* Bảng chọn 9 màu (Color Swatch Popover) */
 .color-popover {
@@ -162,7 +234,11 @@ body {
   padding-top: 8px;
   border-top: 1px solid var(--border-color);
 }
-.color-popover[hidden] { display: none; }
+
+.color-popover[hidden] {
+  display: none;
+}
+
 .swatch-btn {
   width: 16px;
   height: 16px;
@@ -170,7 +246,10 @@ body {
   border: 2px solid transparent;
   cursor: pointer;
 }
-.swatch-btn.active { border-color: var(--text-main); }
+
+.swatch-btn.active {
+  border-color: var(--text-main);
+}
 
 /* BOOKMARK FOLDER EXPLORER (ASIDE) */
 .bm-explorer-bar {
@@ -183,12 +262,14 @@ body {
   padding: 6px 8px;
   margin-bottom: 8px;
 }
+
 .bm-nav-left {
   display: flex;
   align-items: center;
   gap: 6px;
   overflow: hidden;
 }
+
 .sp-breadcrumbs {
   display: flex;
   align-items: center;
@@ -196,6 +277,7 @@ body {
   overflow-x: auto;
   white-space: nowrap;
 }
+
 .crumb-link {
   border: none;
   background: transparent;
@@ -203,11 +285,16 @@ body {
   font-size: 12px;
   cursor: pointer;
 }
+
 .crumb-link.active {
   color: var(--text-main);
   font-weight: 600;
 }
-.crumb-sep { color: var(--text-muted); font-size: 11px; }
+
+.crumb-sep {
+  color: var(--text-muted);
+  font-size: 11px;
+}
 
 .sp-explorer-list {
   background: var(--bg-surface);
@@ -215,6 +302,7 @@ body {
   border-radius: 10px;
   overflow: hidden;
 }
+
 .sp-row {
   display: flex;
   justify-content: space-between;
@@ -223,14 +311,22 @@ body {
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
 }
-.sp-row:last-child { border-bottom: none; }
-.sp-row:hover { background: var(--bg-subtle); }
+
+.sp-row:last-child {
+  border-bottom: none;
+}
+
+.sp-row:hover {
+  background: var(--bg-subtle);
+}
+
 .sp-row-main {
   display: flex;
   align-items: center;
   gap: 8px;
   overflow: hidden;
 }
+
 .type-tag {
   font-size: 10px;
   font-weight: 600;
@@ -241,15 +337,46 @@ body {
   color: var(--text-muted);
   flex-shrink: 0;
 }
-.sp-row[data-type="folder"] .sp-title { font-weight: 600; }
+
+.type-tag-img {
+  width: 18px;
+  aspect-ratio: 1/1;
+  border-radius: 4px;
+  background: var(--bg-canvas);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.sp-row[data-type="folder"] .sp-title {
+  font-weight: 600;
+}
+
 .sp-title {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .empty-hint {
   padding: 24px 12px;
   text-align: center;
   color: var(--text-muted);
   font-size: 12px;
+}
+
+::-webkit-scrollbar {
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface); 
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent); 
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }

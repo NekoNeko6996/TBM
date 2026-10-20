@@ -52,7 +52,7 @@ export const StorageAPI = {
   async addBookmarkNode({ parentId = "root", type, title, url = null, favIconUrl = "" }) {
     const { bookmarkNodes } = await chrome.storage.local.get("bookmarkNodes");
     const id = `${type === "folder" ? "fld" : "bm"}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    
+
     bookmarkNodes[id] = {
       id,
       parentId,
@@ -177,6 +177,13 @@ export const StorageAPI = {
     });
   },
 
+  getFaviconUrl(pageUrl, size = 32) {
+    const url = new URL(chrome.runtime.getURL("/_favicon/"));
+    url.searchParams.set("pageUrl", pageUrl);
+    url.searchParams.set("size", size.toString());
+    return url.toString();
+  },
+
   async importChromeBookmarks() {
     const tree = await chrome.bookmarks.getTree();
     const { bookmarkNodes } = await chrome.storage.local.get("bookmarkNodes");
@@ -195,6 +202,7 @@ export const StorageAPI = {
 
     const traverse = (chromeNode, targetParentId) => {
       if (chromeNode.url) {
+
         const bmId = `bm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         bookmarkNodes[bmId] = {
           id: bmId,
@@ -202,7 +210,7 @@ export const StorageAPI = {
           type: "bookmark",
           title: chromeNode.title || chromeNode.url,
           url: chromeNode.url,
-          favIconUrl: ""
+          favIconUrl: this.getFaviconUrl(chromeNode.url)
         };
         bookmarkNodes[targetParentId].childrenIds.push(bmId);
         importedCount++;

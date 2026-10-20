@@ -508,7 +508,7 @@ kbd {
 .explorer-list-header,
 .explorer-row {
   display: grid;
-  grid-template-columns: 40px minmax(220px, 2fr) 90px minmax(220px, 3fr) 150px;
+  grid-template-columns: 40px 40px minmax(220px, 2fr) 90px minmax(220px, 3fr) 150px;
   align-items: center;
   padding: 10px 16px;
   gap: 12px;
@@ -533,12 +533,25 @@ kbd {
 .explorer-row.selected { background: var(--bg-accent-soft); }
 .explorer-row.is-cut { opacity: 0.45; }
 
+.col-fav {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.col-fav-img {
+  width: 20px;
+  aspect-ratio: 1/1;
+}
+
 .col-name {
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
 .explorer-row[data-type="folder"] .col-name {
   font-weight: 600;
 }

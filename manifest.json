@@ -8,7 +8,8 @@
     "bookmarks",
     "sidePanel",
     "storage",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "favicon" 
   ],
   "background": {
     "service_worker": "background/service-worker.js",
