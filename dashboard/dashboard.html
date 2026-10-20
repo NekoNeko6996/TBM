@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <title>TBM</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar điều hướng gọn gàng, đồng nhất giữa WINDOWS và STORAGE -->
+    <aside class="left-nav">
+      <div class="brand-title">Workspace</div>
+
+      <div class="nav-section-label">WINDOWS</div>
+      <nav class="nav-list">
+        <button class="nav-item active" data-view="windows-all">
+          <span>All Open</span>
+          <span id="nav-count-open" class="pill-count">0</span>
+        </button>
+        <button class="nav-item" data-view="windows-suspended">
+          <span>Suspended</span>
+          <span id="nav-count-suspended" class="pill-count">0</span>
+        </button>
+      </nav>
+
+      <div class="nav-section-label">STORAGE</div>
+      <nav class="nav-list">
+        <button class="nav-item" id="nav-btn-bookmarks" data-view="bookmarks">
+          <span>Bookmarks</span>
+          <span id="nav-count-bookmarks" class="pill-count">0</span>
+        </button>
+        <button class="nav-item" id="nav-btn-saved-groups" data-view="saved-groups">
+          <span>Saved Groups</span>
+          <span id="nav-count-groups" class="pill-count">0</span>
+        </button>
+      </nav>
+    </aside>
+
+    <!-- Khu vực nội dung chính -->
+    <div class="main-area">
+      <header class="topbar">
+        <button id="btn-open-search" class="search-pill-trigger">
+          <span>Search tabs, groups, bookmarks...</span>
+          <kbd class="kbd-hint">/</kbd>
+        </button>
+
+        <div class="topbar-actions">
+          <button id="btn-clean-duplicates" class="btn-outline">
+            Clean Duplicates (<span id="dup-count">0</span>)
+          </button>
+
+          <div class="theme-switch-wrap">
+            <span class="switch-text">Dark Mode</span>
+            <label class="switch">
+              <input type="checkbox" id="chk-theme-toggle" checked>
+              <span class="switch-slider"></span>
+            </label>
+          </div>
+
+          <button id="btn-open-settings" class="btn-outline">Settings</button>
+        </div>
+      </header>
+
+      <main class="workspace-canvas">
+        <!-- VIEW 1: WINDOWS TREE (Hiển thị khi chọn All Open hoặc Suspended) -->
+        <section id="view-windows" class="view-pane">
+          <div id="windows-tree-container" class="windows-grid"></div>
+        </section>
+
+        <!-- VIEW 2: SAVED GROUPS (Hiển thị riêng biệt khi chọn Saved Groups) -->
+        <section id="view-saved-groups" class="view-pane" hidden>
+          <div class="explorer-toolbar">
+            <div class="view-heading">Saved Tab Groups</div>
+            <div class="toolbar-actions">
+              <button id="btn-import-base64" class="btn-outline">Import Base64</button>
+            </div>
+          </div>
+          <div id="saved-groups-grid" class="windows-grid"></div>
+        </section>
+
+        <!-- VIEW 3: BOOKMARKS FILE EXPLORER (Hiển thị riêng biệt khi chọn Bookmarks) -->
+        <section id="view-bookmarks" class="view-pane" hidden>
+          <div class="explorer-toolbar">
+            <!-- Thanh đường dẫn Breadcrumb + Nút Back -->
+            <div class="explorer-nav">
+              <button id="btn-bm-up" class="btn-outline" title="Lên thư mục cha (Backspace)">Up</button>
+              <div id="bm-breadcrumbs" class="breadcrumbs"></div>
+            </div>
+
+            <!-- Thanh thao tác File Explorer: New / Copy / Cut / Paste / Delete -->
+            <div class="toolbar-actions">
+              <span id="clipboard-status" class="clipboard-badge" hidden></span>
+              <button id="btn-bm-new-folder" class="btn-outline">New Folder</button>
+              <button id="btn-bm-new-link" class="btn-outline">New Link</button>
+              <div class="divider-v"></div>
+              <button id="btn-bm-copy" class="btn-outline" disabled title="Ctrl + C">Copy</button>
+              <button id="btn-bm-cut" class="btn-outline" disabled title="Ctrl + X">Cut</button>
+              <button id="btn-bm-paste" class="btn-outline" disabled title="Ctrl + V">Paste</button>
+              <button id="btn-bm-delete" class="btn-outline" disabled title="Delete">Delete</button>
+            </div>
+          </div>
+
+          <!-- Bảng danh sách File Explorer -->
+          <div class="explorer-surface">
+            <div class="explorer-list-header">
+              <div class="col-check">
+                <input type="checkbox" id="chk-bm-select-all" title="Chọn tất cả">
+              </div>
+              <div class="col-name">Name</div>
+              <div class="col-type">Type</div>
+              <div class="col-url">URL / Content</div>
+              <div class="col-actions">Actions</div>
+            </div>
+            <div id="bm-explorer-body" class="explorer-list-body"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL 1: HỘP THOẠI TÌM KIẾM NỔI -->
+  <div id="search-modal" class="modal-backdrop" hidden>
+    <div class="modal-dialog search-dialog">
+      <div class="search-modal-bar">
+        <input type="text" id="inp-modal-search" placeholder="Search tabs, groups, bookmarks..." autocomplete="off">
+        <div class="esc-hint"><kbd>Esc</kbd> to close</div>
+      </div>
+      <div id="search-modal-results" class="search-results-list"></div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: HỘP THOẠI CÀI ĐẶT NỔI -->
+  <div id="settings-modal" class="modal-backdrop" hidden>
+    <div class="modal-dialog settings-dialog">
+      <div class="modal-header">
+        <h2>Settings</h2>
+        <button id="btn-close-settings" class="btn-text">Close</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>General</h3>
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">Auto-group tabs by domain</div>
+            <div class="setting-desc">Tự động gom nhóm khi mở trang web có tên miền mới</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chk-auto-group">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-title">Block duplicate tabs automatically</div>
+            <div class="setting-desc">Chuyển về tab gốc và đóng tab mới nếu trùng URL</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="chk-auto-dedup">
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row-vertical">
+          <label class="setting-title" for="inp-exclude-domains">Excluded domains (comma separated)</label>
+          <input type="text" id="inp-exclude-domains" class="input-text" placeholder="localhost, newtab">
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Explorer & Search Shortcuts</h3>
+        <div class="setting-row">
+          <span class="setting-title">Quick Search</span>
+          <div class="kbd-group"><kbd>/</kbd> <span>or</span> <kbd>Alt</kbd> + <kbd>K</kbd></div>
+        </div>
+        <div class="setting-row">
+          <span class="setting-title">Bookmark Explorer Copy / Cut / Paste</span>
+          <div class="kbd-group"><kbd>Ctrl+C</kbd> <kbd>Ctrl+X</kbd> <kbd>Ctrl+V</kbd></div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h3>Import from Chrome & Backup</h3>
+        <div class="button-grid">
+          <button id="btn-import-chrome-bm" class="btn-outline">Import Chrome Bookmarks</button>
+          <button id="btn-import-chrome-groups" class="btn-outline">Import Chrome Tab Groups</button>
+          <button id="btn-export-json" class="btn-outline">Export Backup JSON</button>
+          <button id="btn-import-json" class="btn-outline">Restore Backup JSON</button>
+          <input type="file" id="inp-import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="dashboard.js"></script>
+</body>
+</html>
