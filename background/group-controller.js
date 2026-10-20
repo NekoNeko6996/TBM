@@ -1,4 +1,17 @@
+export const GROUP_COLORS = [
+  "grey", "blue", "red", "yellow", "green", "pink", "purple", "cyan", "orange"
+];
+
 export const GroupController = {
+  async updateActiveGroup(groupId, { title, color }) {
+    const updateProps = {};
+    if (typeof title === "string") updateProps.title = title.trim();
+    if (typeof color === "string" && GROUP_COLORS.includes(color)) {
+      updateProps.color = color;
+    }
+    return await chrome.tabGroups.update(groupId, updateProps);
+  },
+
   // 1. Lấy toàn bộ cây Cửa sổ -> Nhóm -> Tab (Windows Tree)
   async getWindowsTree() {
     const [windows, groups] = await Promise.all([

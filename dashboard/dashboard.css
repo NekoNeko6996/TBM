@@ -149,6 +149,7 @@ body {
   cursor: pointer;
 }
 .btn-outline:hover { border-color: var(--accent); }
+
 .btn-text {
   border: none;
   background: transparent;
@@ -157,7 +158,9 @@ body {
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
+  white-space: nowrap;
 }
+
 .btn-text:hover {
   color: var(--text-main);
   background: var(--bg-subtle);
@@ -227,14 +230,18 @@ body {
   padding: 18px;
   box-shadow: var(--shadow-card);
 }
+
 .window-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap; /* Tự xuống hàng gọn nếu tên nhóm quá dài */
   margin-bottom: 14px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-color);
 }
+
 .window-header h3 { font-size: 14px; font-weight: 600; }
 
 .group-box {
@@ -247,6 +254,8 @@ body {
 .group-header {
   display: flex;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   align-items: center;
   margin-bottom: 8px;
 }
@@ -554,3 +563,44 @@ kbd {
   text-align: center;
   color: var(--text-muted);
 }
+
+/* GROUP COLOR DOTS & SWATCH POPOVER CHO DASHBOARD */
+.dot-grey   { background: #6b7280; }
+.dot-blue   { background: #3b82f6; }
+.dot-red    { background: #ef4444; }
+.dot-yellow { background: #eab308; }
+.dot-green  { background: #22c55e; }
+.dot-pink   { background: #ec4899; }
+.dot-purple { background: #a855f7; }
+.dot-cyan   { background: #06b6d4; }
+.dot-orange { background: #f97316; }
+
+.group-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.color-popover {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+.color-popover[hidden] { display: none; }
+.swatch-btn {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+}
+.swatch-btn.active { border-color: var(--text-main); }

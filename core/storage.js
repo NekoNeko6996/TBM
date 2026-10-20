@@ -316,5 +316,85 @@ export const StorageAPI = {
       curr = curr.parentId ? nodes[curr.parentId] : null;
     }
     return false;
+  },
+
+  async updateSavedGroup(groupId, { title, color }) {
+    const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
+    const group = savedGroups[groupId];
+    if (!group) return;
+
+    if (typeof title === "string" && title.trim()) {
+      group.title = title.trim();
+    }
+    if (typeof color === "string" && color.trim()) {
+      group.color = color.trim();
+    }
+
+    await chrome.storage.local.set({ savedGroups });
+  },
+
+  async addTabToSavedGroup(groupId, { title, url, favIconUrl = "", pinned = false }, targetIndex = -1) {
+    const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
+    const group = savedGroups[groupId];
+    if (!group) return;
+
+    const newTab = {
+      title: (title || url).trim(),
+      url: url.trim(),
+      favIconUrl,
+      pinned: Boolean(pinned)
+    };
+
+    if (targetIndex >= 0 && targetIndex <= group.tabs.length) {
+      group.tabs.splice(targetIndex, 0, newTab);
+    } else {
+      group.tabs.push(newTab);
+    }
+
+    await chrome.storage.local.set({ savedGroups });
+  },
+
+  async updateTabInSavedGroup(groupId, tabIndex, { title, url }) {
+    const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
+    const group = savedGroups[groupId];
+    if (!group || !group.tabs[tabIndex]) return;
+
+    if (typeof title === "string" && title.trim()) {
+      group.tabs[tabIndex].title = title.trim();
+    }
+    if (typeof url === "string" && url.trim()) {
+      group.tabs[tabIndex].url = url.trim();
+    }
+
+    await chrome.storage.local.set({ savedGroups });
+  },
+
+  // 3. Xóa một tab con khỏi Saved Group
+  async removeTabFromSavedGroup(groupId, tabIndex) {
+    const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
+    const group = savedGroups[groupId];
+    if (!group || !group.tabs[tabIndex]) return;
+
+    group.tabs.splice(tabIndex, 1);
+    await chrome.storage.local.set({ savedGroups });
+  },
+
+  // 4. Kéo thả đổi thứ tự tab trong cùng một Saved Group hoặc chuyển sang Saved Group khác
+  async moveTabBetweenSavedGroups(sourceGroupId, sourceIndex, targetGroupId, targetIndex) {
+    const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
+    const srcGroup = savedGroups[sourceGroupId];
+    const dstGroup = savedGroups[targetGroupId];
+    if (!srcGroup || !dstGroup || !srcGroup.tabs[sourceIndex]) return;
+
+    // Lấy tab ra khỏi vị trí cũ
+    const [movedTab] = srcGroup.tabs.splice(sourceIndex, 1);
+
+    // Chèn vào vị trí mới
+    const insertIdx = targetIndex < 0 || targetIndex > dstGroup.tabs.length
+      ? dstGroup.tabs.length
+      : targetIndex;
+
+    dstGroup.tabs.splice(insertIdx, 0, movedTab);
+    await chrome.storage.local.set({ savedGroups });
   }
 };

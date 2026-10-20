@@ -1,36 +1,42 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <title>Workspace Aside</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="sidepanel.css">
 </head>
 <body>
   <header class="sp-header">
-    <button id="btn-open-dashboard" class="btn-primary">⚙️ Mở Trang Quản Trị</button>
-    <button id="btn-bookmark-active" class="btn-secondary" title="Lưu tab hiện tại vào Bookmark">+ Lưu Tab</button>
+    <div class="sp-brand">Workspace</div>
+    <div class="sp-header-actions">
+      <button id="btn-bookmark-active" class="btn-outline" title="Lưu tab hiện tại vào thư mục đang mở">+ Save Tab</button>
+      <button id="btn-open-dashboard" class="btn-primary">Dashboard</button>
+    </div>
   </header>
 
   <nav class="sp-tabs">
-    <button class="tab-btn active" data-tab="active-groups">Đang mở</button>
-    <button class="tab-btn" data-tab="saved-groups">Đã lưu</button>
+    <button class="tab-btn active" data-tab="active-groups">Open Groups</button>
+    <button class="tab-btn" data-tab="saved-groups">Saved</button>
     <button class="tab-btn" data-tab="bookmarks">Bookmarks</button>
   </nav>
 
   <main class="sp-content">
-    <!-- Tab 1: Active Tab Groups -->
+    <!-- Tab 1: Nhóm đang mở -->
     <section id="active-groups" class="tab-pane active"></section>
 
-    <!-- Tab 2: Saved Groups -->
+    <!-- Tab 2: Nhóm đã lưu -->
     <section id="saved-groups" class="tab-pane"></section>
 
-    <!-- Tab 3: Independent Bookmarks -->
+    <!-- Tab 3: Bookmark Folder Explorer -->
     <section id="bookmarks" class="tab-pane">
-      <div class="bm-toolbar">
-        <select id="sp-folder-select"></select>
-        <button id="btn-new-folder" class="btn-icon" title="Tạo thư mục mới">+📁</button>
+      <div class="bm-explorer-bar">
+        <div class="bm-nav-left">
+          <button id="btn-sp-up" class="btn-outline" disabled>Up</button>
+          <div id="sp-breadcrumbs" class="sp-breadcrumbs"></div>
+        </div>
+        <button id="btn-new-folder" class="btn-text">+ Folder</button>
       </div>
-      <div id="sp-bookmark-tree"></div>
+      <div id="sp-bookmark-list" class="sp-explorer-list"></div>
     </section>
   </main>
 

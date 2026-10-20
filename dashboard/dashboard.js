@@ -1,5 +1,5 @@
 import { StorageAPI } from "../core/storage.js";
-import { GroupController } from "../background/group-controller.js";
+import { GroupController, GROUP_COLORS } from "../background/group-controller.js";
 import { BackupManager, ShareCodec } from "../core/share.js";
 
 let dragPayload = null;
@@ -79,6 +79,33 @@ async function initUIAndEvents() {
       updateActiveViewPane();
       refreshAll();
     });
+  });
+
+  // Bổ sung vào trong hàm initUIAndEvents() của dashboard/dashboard.js
+  setupDropzone(document.getElementById("nav-btn-saved-groups"), async (payload) => {
+    if (payload.type !== "TAB") return;
+    const { savedGroups = {} } = await StorageAPI.getAllData();
+    const groupList = Object.values(savedGroups);
+
+    if (groupList.length === 0) {
+      // Nếu chưa có nhóm lưu nào, tạo mới một Saved Group chứa tab vừa thả
+      const newId = `grp_${Date.now()}`;
+      savedGroups[newId] = {
+        id: newId,
+        title: "Quick Saved",
+        color: "blue",
+        createdAt: Date.now(),
+        tabs: [{ title: payload.title, url: payload.url, favIconUrl: payload.favIconUrl, pinned: false }]
+      };
+      await chrome.storage.local.set({ savedGroups });
+    } else {
+      // Thêm vào nhóm đã lưu đầu tiên trong danh sách
+      await StorageAPI.addTabToSavedGroup(groupList[0].id, {
+        title: payload.title,
+        url: payload.url,
+        favIconUrl: payload.favIconUrl
+      });
+    }
   });
 
   // Cho phép kéo Tab từ Windows View thả thẳng vào nút "Bookmarks" ở Sidebar trái để lưu vào thư mục hiện tại
@@ -591,6 +618,7 @@ async function refreshAll() {
   document.getElementById("dup-count").textContent = totalDuplicates;
 }
 
+// Thay thế hàm renderSavedGroupsView(savedGroups) trong dashboard/dashboard.js
 function renderSavedGroupsView(savedGroups) {
   const container = document.getElementById("saved-groups-grid");
   container.innerHTML = "";
@@ -606,17 +634,50 @@ function renderSavedGroupsView(savedGroups) {
     card.className = "window-box";
     card.innerHTML = `
       <div class="window-header">
-        <h3>${g.title} (${g.tabs.length} tabs)</h3>
+        <div class="group-title-wrap">
+          <button class="color-dot dot-${g.color || 'grey'}" data-act="toggle-color" title="Đổi màu nhóm"></button>
+          <h3>${g.title} (${g.tabs.length})</h3>
+        </div>
         <div class="actions">
+          <button class="btn-text" data-act="add-tab">+ Add Link</button>
           <button class="btn-text" data-act="restore">Restore</button>
-          <button class="btn-text" data-act="share">Share Base64</button>
+          <button class="btn-text" data-act="rename">Rename</button>
+          <button class="btn-text" data-act="share">Share</button>
           <button class="btn-text" data-act="del">Delete</button>
         </div>
+      </div>
+      <div class="color-popover" hidden>
+        ${GROUP_COLORS.map(c => `<button class="swatch-btn dot-${c}${c === g.color ? 'active' : ''}" data-color="${c}" title="${c}"></button>`).join("")}
       </div>
       <div class="tab-list"></div>
     `;
 
+    // 1. Đổi màu nhóm đã lưu
+    const popover = card.querySelector(".color-popover");
+    card.querySelector('[data-act="toggle-color"]').addEventListener("click", () => {
+      popover.hidden = !popover.hidden;
+    });
+    popover.querySelectorAll(".swatch-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        await StorageAPI.updateSavedGroup(g.id, { color: btn.dataset.color });
+      });
+    });
+
+    // 2. Thêm tab mới trực tiếp vào nhóm đã lưu
+    card.querySelector('[data-act="add-tab"]').addEventListener("click", async () => {
+      const title = prompt("Nhập tiêu đề trang web:");
+      if (!title) return;
+      const url = prompt("Nhập URL (bắt đầu bằng https://):", "https://");
+      if (!url || !url.startsWith("http")) return;
+      await StorageAPI.addTabToSavedGroup(g.id, { title, url });
+    });
+
+    // 3. Khôi phục, Đổi tên, Chia sẻ, Xóa nhóm
     card.querySelector('[data-act="restore"]').addEventListener("click", () => GroupController.restoreGroup(g.id));
+    card.querySelector('[data-act="rename"]').addEventListener("click", async () => {
+      const nextTitle = prompt("Đổi tên nhóm đã lưu:", g.title);
+      if (nextTitle) await StorageAPI.updateSavedGroup(g.id, { title: nextTitle });
+    });
     card.querySelector('[data-act="share"]').addEventListener("click", async () => {
       const code = await ShareCodec.encodeSavedGroup(g.id);
       await navigator.clipboard.writeText(code);
@@ -624,21 +685,105 @@ function renderSavedGroupsView(savedGroups) {
     });
     card.querySelector('[data-act="del"]').addEventListener("click", () => StorageAPI.deleteSavedGroup(g.id));
 
+    // 4. Render danh sách các tab con bên trong nhóm (Hỗ trợ Drag & Drop, Edit, Remove)
     const tabList = card.querySelector(".tab-list");
-    g.tabs.forEach(t => {
+    if (g.tabs.length === 0) {
+      tabList.innerHTML = `<div class="empty-folder-state" style="padding: 16px;">Empty group. Click "+ Add Link" or drag tabs here.</div>`;
+    }
+
+    g.tabs.forEach((t, tabIdx) => {
       const row = document.createElement("div");
       row.className = "tab-item";
+      row.draggable = true;
+
       row.innerHTML = `
-        <div class="tab-info">
+        <div class="tab-info" title="${t.url}">
           <img src="${t.favIconUrl || ""}" alt="">
           <span class="tab-title">${t.title}</span>
         </div>
         <div class="actions">
           <button class="btn-text" data-act="open-single">Open</button>
+          <button class="btn-text" data-act="edit-tab">Edit</button>
+          <button class="btn-text" data-act="remove-tab">Remove</button>
         </div>
       `;
-      row.querySelector('[data-act="open-single"]').addEventListener("click", () => chrome.tabs.create({ url: t.url }));
+
+      // Bắt đầu kéo một tab con trong Saved Group
+      row.addEventListener("dragstart", (e) => {
+        e.stopPropagation();
+        dragPayload = {
+          type: "SAVED_TAB",
+          sourceGroupId: g.id,
+          sourceIndex: tabIdx,
+          title: t.title,
+          url: t.url,
+          favIconUrl: t.favIconUrl || ""
+        };
+        row.classList.add("dragging");
+      });
+
+      row.addEventListener("dragend", () => {
+        row.classList.remove("dragging");
+        dragPayload = null;
+      });
+
+      // Thả một tab khác đè lên dòng này để chèn đúng vị trí thứ tự (Reorder)
+      setupDropzone(row, async (payload) => {
+        if (payload.type === "SAVED_TAB") {
+          if (payload.sourceGroupId === g.id && payload.sourceIndex === tabIdx) return;
+          await StorageAPI.moveTabBetweenSavedGroups(
+            payload.sourceGroupId,
+            payload.sourceIndex,
+            g.id,
+            tabIdx
+          );
+        } else if (payload.type === "TAB") {
+          await StorageAPI.addTabToSavedGroup(g.id, {
+            title: payload.title,
+            url: payload.url,
+            favIconUrl: payload.favIconUrl
+          }, tabIdx);
+        }
+      });
+
+      // Mở lẻ 1 tab
+      row.querySelector('[data-act="open-single"]').addEventListener("click", () => {
+        chrome.tabs.create({ url: t.url });
+      });
+
+      // Sửa tiêu đề và URL của tab con
+      row.querySelector('[data-act="edit-tab"]').addEventListener("click", async () => {
+        const newTitle = prompt("Sửa tiêu đề tab:", t.title);
+        if (newTitle === null) return;
+        const newUrl = prompt("Sửa URL tab:", t.url);
+        if (newUrl === null) return;
+        await StorageAPI.updateTabInSavedGroup(g.id, tabIdx, { title: newTitle, url: newUrl });
+      });
+
+      // Xóa lẻ 1 tab khỏi nhóm đã lưu
+      row.querySelector('[data-act="remove-tab"]').addEventListener("click", async () => {
+        await StorageAPI.removeTabFromSavedGroup(g.id, tabIdx);
+      });
+
       tabList.appendChild(row);
+    });
+
+    // Dropzone cho cả khung Card của Saved Group (Khi thả vào vùng trống cuối danh sách)
+    setupDropzone(card, async (payload) => {
+      if (payload.type === "SAVED_TAB") {
+        await StorageAPI.moveTabBetweenSavedGroups(
+          payload.sourceGroupId,
+          payload.sourceIndex,
+          g.id,
+          g.tabs.length
+        );
+      } else if (payload.type === "TAB") {
+        await StorageAPI.addTabToSavedGroup(g.id, {
+          title: payload.title,
+          url: payload.url,
+          favIconUrl: payload.favIconUrl
+        });
+      }
     });
 
     container.appendChild(card);
@@ -796,8 +941,11 @@ async function renderWindowsTree() {
     container.appendChild(winBox);
   });
 
-  document.getElementById("nav-count-open").textContent = openCount;
-  document.getElementById("nav-count-suspended").textContent = suspendedCount;
+  const openBadge = document.getElementById("nav-count-open");
+  if (openBadge) {
+    openBadge.textContent = suspendedCount > 0 ? `${openCount} (${suspendedCount} zzz)` : openCount;
+    openBadge.title = `${openCount} tab đang mở, trong đó ${suspendedCount} tab đã giải phóng RAM`;
+  }
 }
 
 function createGroupDOM(group, windowId) {
@@ -805,8 +953,12 @@ function createGroupDOM(group, windowId) {
   box.className = "group-box";
   box.innerHTML = `
     <div class="group-header">
-      <span class="group-title">${group.title || "Untitled"} (${group.tabs.length})</span>
+      <div class="group-title-wrap">
+        <button class="color-dot dot-${group.color || 'grey'}" data-act="toggle-color" title="Đổi màu nhóm"></button>
+        <span class="group-title">${group.title || "Untitled"} (${group.tabs.length})</span>
+      </div>
       <div class="actions">
+        <button class="btn-text" data-act="rename">Rename</button>
         <button class="btn-text" data-act="suspend">Suspend</button>
         <button class="btn-text" data-act="save">Save</button>
         <button class="btn-text" data-act="share">Share</button>
@@ -814,8 +966,29 @@ function createGroupDOM(group, windowId) {
         <button class="btn-text" data-act="delete">Delete</button>
       </div>
     </div>
+    <div class="color-popover" hidden>
+      ${GROUP_COLORS.map(c => `<button class="swatch-btn dot-${c}${c === group.color ? 'active' : ''}" data-color="${c}" title="${c}"></button>`).join("")}
+    </div>
     <div class="tab-list"></div>
   `;
+
+  const popover = box.querySelector(".color-popover");
+  box.querySelector('[data-act="toggle-color"]').addEventListener("click", () => {
+    popover.hidden = !popover.hidden;
+  });
+
+  popover.querySelectorAll(".swatch-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await GroupController.updateActiveGroup(group.id, { color: btn.dataset.color });
+    });
+  });
+
+  box.querySelector('[data-act="rename"]').addEventListener("click", async () => {
+    const nextTitle = prompt("Nhập tên mới cho nhóm tab:", group.title || "");
+    if (nextTitle !== null) {
+      await GroupController.updateActiveGroup(group.id, { title: nextTitle });
+    }
+  });
 
   box.querySelector('[data-act="suspend"]').addEventListener("click", () => GroupController.suspendGroup(group.id));
   box.querySelector('[data-act="save"]').addEventListener("click", () => GroupController.saveGroup(group.id, false));
