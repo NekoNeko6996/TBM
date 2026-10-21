@@ -1,6 +1,8 @@
 import { StorageAPI } from "../core/storage.js";
 import { GroupController } from "./group-controller.js";
 
+const domainGroupLocks = new Map();
+
 chrome.runtime.onInstalled.addListener(async () => {
   await StorageAPI.init();
   // Cho phép mở Aside trực tiếp khi click vào icon extension
@@ -11,56 +13,72 @@ chrome.runtime.onInstalled.addListener(async () => {
 chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
   if (!changeInfo.url || !tab.url.startsWith("http")) return;
 
+  // Nếu tab này đã nằm sẵn trong một Group rồi thì bỏ qua, không tự gom nhóm lại
+  if (tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+
+  // Nếu đang trong quá trình Restore Group thì tạm dừng Auto-group để tránh xung đột
+  const { isRestoringGroup } = await chrome.storage.session.get("isRestoringGroup");
+  if (isRestoringGroup) return;
+
   const settings = await StorageAPI.getSettings();
 
+  // 1. Kiểm tra chặn tab trùng lặp
   if (settings.autoDeduplicate) {
     const targetNorm = GroupController.normalizeUrlForDedup(tab.url, settings.ignoreUrlHash);
     const allTabs = await chrome.tabs.query({ windowType: "normal" });
-
     const existingTab = allTabs.find(
       t => t.id !== tabId &&
       GroupController.normalizeUrlForDedup(t.url, settings.ignoreUrlHash) === targetNorm
     );
 
     if (existingTab) {
-      // Chuyển focus về tab gốc đã mở trước đó và đóng tab mới bị trùng
       await chrome.windows.update(existingTab.windowId, { focused: true });
       await chrome.tabs.update(existingTab.id, { active: true });
       await chrome.tabs.remove(tabId);
-      return; // Dừng luôn, không cần chạy auto-group cho tab đã bị đóng
+      return;
     }
   }
 
+  // 2. Tự động gom nhóm theo tên miền (Có cơ chế Lock chống tạo 2 group trùng nhau)
   if (!settings.autoGroupByDomain) return;
 
   try {
     const urlObj = new URL(tab.url);
     const domain = urlObj.hostname.replace(/^www\./, "");
-
     if (settings.excludeDomains.includes(domain)) return;
 
-    // Tìm xem trong cửa sổ hiện tại đã có group mang tên domain này chưa
-    const existingGroups = await chrome.tabGroups.query({
-      windowId: tab.windowId,
-      title: domain
-    });
-
-    if (existingGroups.length > 0) {
-      const targetGroupId = existingGroups[0].id;
-      if (tab.groupId !== targetGroupId) {
-        await chrome.tabs.group({ groupId: targetGroupId, tabIds: [tabId] });
-      }
-    } else {
-      // Tạo group mới và đặt tên theo domain
-      const newGroupId = await chrome.tabs.group({
-        createProperties: { windowId: tab.windowId },
-        tabIds: [tabId]
-      });
-      await chrome.tabGroups.update(newGroupId, {
-        title: domain,
-        color: getColorFromDomain(domain)
-      });
+    const lockKey = `${tab.windowId}_${domain}`;
+    while (domainGroupLocks.get(lockKey)) {
+      await domainGroupLocks.get(lockKey);
     }
+
+    const taskPromise = (async () => {
+      // Kiểm tra lại trạng thái mới nhất của tab sau khi qua hàng đợi Lock
+      const freshTab = await chrome.tabs.get(tabId).catch(() => null);
+      if (!freshTab || freshTab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) return;
+
+      const existingGroups = await chrome.tabGroups.query({
+        windowId: freshTab.windowId,
+        title: domain
+      });
+
+      if (existingGroups.length > 0) {
+        await chrome.tabs.group({ groupId: existingGroups[0].id, tabIds: [tabId] });
+      } else {
+        const newGroupId = await chrome.tabs.group({
+          createProperties: { windowId: freshTab.windowId },
+          tabIds: [tabId]
+        });
+        await chrome.tabGroups.update(newGroupId, {
+          title: domain,
+          color: getColorFromDomain(domain)
+        });
+      }
+    })();
+
+    domainGroupLocks.set(lockKey, taskPromise);
+    await taskPromise;
+    domainGroupLocks.delete(lockKey);
   } catch (err) {
     console.error("Auto-group error:", err);
   }

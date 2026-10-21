@@ -76,13 +76,19 @@ export const GroupController = {
     ]);
 
     const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
-    const savedId = `grp_${Date.now()}`;
+    const groupTitle = (group.title || "Untitled Group").trim();
+
+    // Tìm xem đã có nhóm lưu nào trùng tên chưa để ghi đè, tránh nhân bản
+    const existingEntry = Object.values(savedGroups).find(
+      g => g.title.toLowerCase() === groupTitle.toLowerCase()
+    );
+    const savedId = existingEntry ? existingEntry.id : `grp_${Date.now()}`;
 
     savedGroups[savedId] = {
       id: savedId,
-      title: group.title || "Untitled Group",
+      title: groupTitle,
       color: group.color,
-      createdAt: Date.now(),
+      createdAt: existingEntry ? existingEntry.createdAt : Date.now(),
       tabs: tabs.map(t => ({
         title: t.title,
         url: t.url,
@@ -99,32 +105,59 @@ export const GroupController = {
     return savedGroups[savedId];
   },
 
-  // 4. Khôi phục nhóm tab đã lưu (Restore Group)
+  // 4. Khôi phục nhóm tab đã lưu (Bật cờ chặn Auto-group xung đột & chống mở trùng nhóm)
   async restoreGroup(savedGroupId, targetWindowId = chrome.windows.WINDOW_ID_CURRENT) {
     const { savedGroups = {} } = await chrome.storage.local.get("savedGroups");
     const groupData = savedGroups[savedGroupId];
     if (!groupData || !groupData.tabs.length) return;
 
-    const createdTabIds = [];
-    for (const tabInfo of groupData.tabs) {
-      const newTab = await chrome.tabs.create({
-        windowId: targetWindowId,
-        url: tabInfo.url,
-        pinned: tabInfo.pinned || false,
-        active: false
+    // Bật cờ báo hiệu đang Restore để service-worker không tự ý cắt lẻ tab ra tạo group riêng
+    await chrome.storage.session.set({ isRestoringGroup: true });
+
+    try {
+      const win = targetWindowId === chrome.windows.WINDOW_ID_CURRENT
+        ? await chrome.windows.getCurrent()
+        : { id: targetWindowId };
+
+      // Kiểm tra xem trên cửa sổ hiện tại đã có sẵn Group nào mang tên này chưa
+      const existingGroups = await chrome.tabGroups.query({
+        windowId: win.id,
+        title: groupData.title
       });
-      createdTabIds.push(newTab.id);
+
+      const createdTabIds = [];
+      for (const tabInfo of groupData.tabs) {
+        const newTab = await chrome.tabs.create({
+          windowId: win.id,
+          url: tabInfo.url,
+          pinned: tabInfo.pinned || false,
+          active: false
+        });
+        createdTabIds.push(newTab.id);
+      }
+
+      if (existingGroups.length > 0) {
+        // Nếu nhóm đã mở sẵn trên thanh tab, gộp vào nhóm đó thay vì tạo nhóm trùng
+        await chrome.tabs.group({
+          groupId: existingGroups[0].id,
+          tabIds: createdTabIds
+        });
+      } else {
+        const newGroupId = await chrome.tabs.group({
+          createProperties: { windowId: win.id },
+          tabIds: createdTabIds
+        });
+        await chrome.tabGroups.update(newGroupId, {
+          title: groupData.title,
+          color: groupData.color
+        });
+      }
+    } finally {
+      // Mở lại cờ sau khi hoàn tất gom nhóm
+      setTimeout(() => {
+        chrome.storage.session.set({ isRestoringGroup: false });
+      }, 300);
     }
-
-    const newGroupId = await chrome.tabs.group({
-      createProperties: { windowId: targetWindowId },
-      tabIds: createdTabIds
-    });
-
-    await chrome.tabGroups.update(newGroupId, {
-      title: groupData.title,
-      color: groupData.color
-    });
   },
 
   // 5. Hủy nhóm (Ungroup) - Giữ lại các tab nhưng bỏ khung group

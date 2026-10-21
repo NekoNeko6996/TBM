@@ -52,12 +52,14 @@ export const StorageAPI = {
   async addBookmarkNode({ parentId = "root", type, title, url = null, favIconUrl = "" }) {
     const { bookmarkNodes } = await chrome.storage.local.get("bookmarkNodes");
     const id = `${type === "folder" ? "fld" : "bm"}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const now = Date.now();
 
     bookmarkNodes[id] = {
       id,
       parentId,
       type,
       title,
+      createdAt: now,
       ...(type === "folder" ? { childrenIds: [] } : { url, favIconUrl })
     };
 
@@ -201,8 +203,8 @@ export const StorageAPI = {
     bookmarkNodes.root.childrenIds.push(importRootId);
 
     const traverse = (chromeNode, targetParentId) => {
+      const timestamp = chromeNode.dateAdded || (Date.now() + seq++);
       if (chromeNode.url) {
-
         const bmId = `bm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         bookmarkNodes[bmId] = {
           id: bmId,
@@ -210,7 +212,8 @@ export const StorageAPI = {
           type: "bookmark",
           title: chromeNode.title || chromeNode.url,
           url: chromeNode.url,
-          favIconUrl: this.getFaviconUrl(chromeNode.url)
+          favIconUrl: this.getFaviconUrl(chromeNode.url),
+          createdAt: timestamp
         };
         bookmarkNodes[targetParentId].childrenIds.push(bmId);
         importedCount++;
@@ -224,7 +227,8 @@ export const StorageAPI = {
             parentId: targetParentId,
             type: "folder",
             title: chromeNode.title,
-            childrenIds: []
+            childrenIds: [],
+            createdAt: timestamp
           };
           bookmarkNodes[targetParentId].childrenIds.push(fldId);
           nextParentId = fldId;
@@ -294,10 +298,13 @@ export const StorageAPI = {
 
     const cloneRecursive = (nodeToClone, parentId) => {
       const newId = `${nodeToClone.type === "folder" ? "fld" : "bm"}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const now = Date.now();
+      
       const cloned = {
         ...nodeToClone,
         id: newId,
         parentId,
+        createdAt: now,
         title: parentId === nodeToClone.parentId ? `${nodeToClone.title} (Copy)` : nodeToClone.title,
         ...(nodeToClone.type === "folder" ? { childrenIds: [] } : {})
       };

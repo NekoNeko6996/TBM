@@ -2,6 +2,15 @@ import { StorageAPI } from "../core/storage.js";
 import { GroupController, GROUP_COLORS } from "../background/group-controller.js";
 
 let currentSpFolderId = "root";
+let renderTimer = null;
+let renderSeq = 0;
+
+function scheduleRender() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(() => {
+    renderAll();
+  }, 80);
+}
 
 document.addEventListener("DOMContentLoaded", async () => {
   await StorageAPI.init();
@@ -9,11 +18,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   setupHeaderAndExplorerActions();
   await renderAll();
 
-  chrome.storage.onChanged.addListener(renderAll);
-  chrome.tabGroups.onUpdated.addListener(renderAll);
-  chrome.tabGroups.onCreated.addListener(renderAll);
-  chrome.tabGroups.onRemoved.addListener(renderAll);
-  chrome.tabs.onRemoved.addListener(renderAll);
+  chrome.storage.onChanged.addListener(scheduleRender);
+  chrome.tabGroups.onUpdated.addListener(scheduleRender);
+  chrome.tabGroups.onCreated.addListener(scheduleRender);
+  chrome.tabGroups.onRemoved.addListener(scheduleRender);
+  chrome.tabs.onRemoved.addListener(scheduleRender);
 });
 
 function setupTabs() {
@@ -78,12 +87,29 @@ async function renderAll() {
 
 // 1. RENDER NHÓM ĐANG MỞ (Hỗ trợ Đổi tên + Đổi màu trực tiếp)
 async function renderActiveGroups() {
+  const currentSeq = ++renderSeq;
   const container = document.getElementById("active-groups");
-  const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
-  container.innerHTML = groups.length ? "" : `<div class="empty-hint">No active tab groups in this window.</div>`;
 
-  for (const g of groups) {
-    const tabs = await chrome.tabs.query({ groupId: g.id });
+  // Lấy toàn bộ group và số lượng tab của từng group cùng lúc TRƯỚC KHI chạm vào DOM
+  const groups = await chrome.tabGroups.query({ windowId: chrome.windows.WINDOW_ID_CURRENT });
+  const groupsWithTabs = await Promise.all(
+    groups.map(async (g) => {
+      const tabs = await chrome.tabs.query({ groupId: g.id });
+      return { group: g, tabCount: tabs.length };
+    })
+  );
+
+  // Nếu trong lúc đang await mà có một lệnh render mới hơn được gọi thì hủy lượt cũ này
+  if (currentSeq !== renderSeq) return;
+
+  if (groupsWithTabs.length === 0) {
+    container.innerHTML = `<div class="empty-hint">No active tab groups in this window.</div>`;
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+
+  for (const { group: g, tabCount } of groupsWithTabs) {
     const card = document.createElement("div");
     card.className = "card";
 
@@ -92,7 +118,7 @@ async function renderActiveGroups() {
         <div class="group-title-wrap">
           <button class="color-dot dot-${g.color || 'grey'}" data-act="toggle-color" title="Đổi màu nhóm"></button>
           <span class="group-name">${g.title || "Untitled"}</span>
-          <span class="group-count">(${tabs.length})</span>
+          <span class="group-count">(${tabCount})</span>
         </div>
         <div class="actions">
           <button class="btn-text" data-act="rename">Rename</button>
@@ -105,20 +131,17 @@ async function renderActiveGroups() {
       </div>
     `;
 
-    // Bật/tắt thanh chọn màu
     const popover = card.querySelector(".color-popover");
     card.querySelector('[data-act="toggle-color"]').addEventListener("click", () => {
       popover.hidden = !popover.hidden;
     });
 
-    // Chọn màu mới
     popover.querySelectorAll(".swatch-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         await GroupController.updateActiveGroup(g.id, { color: btn.dataset.color });
       });
     });
 
-    // Đổi tên nhóm
     card.querySelector('[data-act="rename"]').addEventListener("click", async () => {
       const nextTitle = prompt("Đổi tên nhóm:", g.title || "");
       if (nextTitle !== null) {
@@ -129,8 +152,11 @@ async function renderActiveGroups() {
     card.querySelector('[data-act="suspend"]').addEventListener("click", () => GroupController.suspendGroup(g.id));
     card.querySelector('[data-act="save"]').addEventListener("click", () => GroupController.saveGroup(g.id, true));
 
-    container.appendChild(card);
+    fragment.appendChild(card);
   }
+
+  // Xóa và gắn toàn bộ danh sách mới trong 1 thao tác đồng bộ duy nhất
+  container.replaceChildren(fragment);
 }
 
 // 2. RENDER NHÓM ĐÃ LƯU (Hỗ trợ Đổi tên + Đổi màu trực tiếp)
@@ -187,6 +213,14 @@ function renderSavedGroups(savedGroups) {
 }
 
 // 3. RENDER BOOKMARK FOLDER EXPLORER TRÊN ASIDE (Không hiển thị trải dài)
+function getNodeTime(node) {
+  if (!node) return 0;
+  if (node.createdAt) return node.createdAt;
+  const parts = String(node.id).split("_");
+  const timestamp = Number(parts[1]);
+  return !Number.isNaN(timestamp) ? timestamp : 0;
+}
+
 function renderBookmarkExplorer(nodes) {
   if (!nodes[currentSpFolderId]) currentSpFolderId = "root";
   const currentFolder = nodes[currentSpFolderId];
@@ -228,8 +262,13 @@ function renderBookmarkExplorer(nodes) {
     .map(id => nodes[id])
     .filter(Boolean)
     .sort((a, b) => {
-      if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
-      return a.title.localeCompare(b.title);
+      // 1. Giữ các Folder nằm ở nhóm trên, Bookmark nằm ở nhóm dưới
+      if (a.type !== b.type) {
+        return a.type === "folder" ? -1 : 1;
+      }
+      // 2. Sắp xếp từ cũ nhất đến mới nhất (từ trên xuống dưới)
+      // Nếu 2 mục được import cùng 1 mili-giây (hiệu bằng 0), JS Array.sort sẽ tự giữ nguyên thứ tự gốc trong mảng childrenIds
+      return getNodeTime(a) - getNodeTime(b);
     });
 
   if (children.length === 0) {
@@ -248,13 +287,13 @@ function renderBookmarkExplorer(nodes) {
         ${item.type === "folder" ? `
           <svg width="18px" height="18px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M3 8.2C3 7.07989 3 6.51984 3.21799 6.09202C3.40973 5.71569 3.71569 5.40973 4.09202 5.21799C4.51984 5 5.0799 5 6.2 5H9.67452C10.1637 5 10.4083 5 10.6385 5.05526C10.8425 5.10425 11.0376 5.18506 11.2166 5.29472C11.4184 5.4184 11.5914 5.59135 11.9373 5.93726L12.0627 6.06274C12.4086 6.40865 12.5816 6.5816 12.7834 6.70528C12.9624 6.81494 13.1575 6.89575 13.3615 6.94474C13.5917 7 13.8363 7 14.3255 7H17.8C18.9201 7 19.4802 7 19.908 7.21799C20.2843 7.40973 20.5903 7.71569 20.782 8.09202C21 8.51984 21 9.0799 21 10.2V15.8C21 16.9201 21 17.4802 20.782 17.908C20.5903 18.2843 20.2843 18.5903 19.908 18.782C19.4802 19 18.9201 19 17.8 19H6.2C5.07989 19 4.51984 19 4.09202 18.782C3.71569 18.5903 3.40973 18.2843 3.21799 17.908C3 17.4802 3 16.9201 3 15.8V8.2Z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>` 
-          : 
-          item.favIconUrl != ""?
+          </svg>`
+        :
+        item.favIconUrl != "" ?
           `<img class="type-tag-img" src="${item.favIconUrl}"></img>`
           :
           '<span class="type-tag">URL</span>'
-        }
+      }
 
         <span class="sp-title">${item.title}</span>
       </div>

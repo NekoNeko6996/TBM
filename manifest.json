@@ -9,7 +9,7 @@
     "sidePanel",
     "storage",
     "unlimitedStorage",
-    "favicon" 
+    "favicon"
   ],
   "background": {
     "service_worker": "background/service-worker.js",
